@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 
 import discord
 from discord.ext import commands, tasks
-from discord import app_commands
 
 import openpyxl
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
@@ -26,7 +25,10 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents
+)
 
 # =========================
 # DB
@@ -125,15 +127,19 @@ def create_poll_embed(day, deadline_text):
 
         users = [u[0] for u in users]
 
-        text += f"### {slot} ({len(users)})\n"
-
+        # 投票者がいる時間帯のみ表示
         if users:
-            for user in users:
-                text += f"・{user}\n"
-        else:
-            text += "なし\n"
 
-        text += "\n"
+            user_text = ", ".join(users)
+
+            text += (
+                f"**{slot} ({len(users)})** "
+                f"{user_text}\n"
+            )
+
+    # 誰も投票してない時
+    if text == "":
+        text = "まだ投票がありません"
 
     embed.description = text
 
@@ -165,13 +171,46 @@ class TimeButton(discord.ui.Button):
         user_id = str(interaction.user.id)
         user_name = interaction.user.display_name
 
+        # =========================
+        # 締切チェック
+        # =========================
+
+        poll_data = c.execute("""
+        SELECT deadline, closed
+        FROM polls
+        WHERE day=?
+        ORDER BY rowid DESC
+        LIMIT 1
+        """, (self.day,)).fetchone()
+
+        if poll_data:
+
+            deadline, closed = poll_data
+
+            if closed == 1:
+
+                await interaction.response.send_message(
+                    "このアンケートは締切済みです",
+                    ephemeral=True
+                )
+
+                return
+
+        # =========================
+        # 既存投票確認
+        # =========================
+
         c.execute("""
         SELECT *
         FROM votes
         WHERE user_id=?
         AND day=?
         AND time_slot=?
-        """, (user_id, self.day, self.slot))
+        """, (
+            user_id,
+            self.day,
+            self.slot
+        ))
 
         exists = c.fetchone()
 
@@ -186,7 +225,11 @@ class TimeButton(discord.ui.Button):
             WHERE user_id=?
             AND day=?
             AND time_slot=?
-            """, (user_id, self.day, self.slot))
+            """, (
+                user_id,
+                self.day,
+                self.slot
+            ))
 
         # =========================
         # 投票追加
@@ -207,7 +250,7 @@ class TimeButton(discord.ui.Button):
         conn.commit()
 
         # =========================
-        # ボタン更新
+        # ボタン人数更新
         # =========================
 
         for item in self.view.children:
@@ -224,7 +267,9 @@ class TimeButton(discord.ui.Button):
                     item.slot
                 )).fetchone()[0]
 
-                item.label = f"{item.slot} ({users})"
+                item.label = (
+                    f"{item.slot} ({users})"
+                )
 
         # =========================
         # Embed更新
@@ -232,9 +277,9 @@ class TimeButton(discord.ui.Button):
 
         deadlines = get_deadlines()
 
-        deadline_text = deadlines[self.day - 1].strftime(
-            "〆%m/%d 18時"
-        )
+        deadline_text = deadlines[
+            self.day - 1
+        ].strftime("〆%m/%d 18時")
 
         embed = create_poll_embed(
             self.day,
@@ -263,11 +308,16 @@ class PollView(discord.ui.View):
             FROM votes
             WHERE day=?
             AND time_slot=?
-            """, (day, slot)).fetchone()[0]
+            """, (
+                day,
+                slot
+            )).fetchone()[0]
 
             button = TimeButton(day, slot)
 
-            button.label = f"{slot} ({users})"
+            button.label = (
+                f"{slot} ({users})"
+            )
 
             self.add_item(button)
 
@@ -367,16 +417,30 @@ async def export_excel(interaction: discord.Interaction):
                 title=DAY_TITLES[day - 1]
             )
 
-        ws.cell(row=1, column=1, value="名前")
+        ws.cell(
+            row=1,
+            column=1,
+            value="名前"
+        )
 
         for i, slot in enumerate(TIME_SLOTS):
-            ws.cell(
+
+            header = ws.cell(
                 row=1,
                 column=i + 2,
                 value=slot
             )
 
-        for row_idx, user in enumerate(users, start=2):
+            header.fill = orange
+            header.border = border
+            header.alignment = Alignment(
+                horizontal="center"
+            )
+
+        for row_idx, user in enumerate(
+            users,
+            start=2
+        ):
 
             name_cell = ws.cell(
                 row=row_idx,
@@ -409,12 +473,16 @@ async def export_excel(interaction: discord.Interaction):
                 )).fetchone()
 
                 if result:
+
                     cell.fill = orange
                     user_has_vote = True
+
                 else:
+
                     cell.fill = gray
 
                 cell.border = border
+
                 cell.alignment = Alignment(
                     horizontal="center"
                 )
@@ -424,20 +492,18 @@ async def export_excel(interaction: discord.Interaction):
 
             name_cell.border = border
 
+            name_cell.alignment = Alignment(
+                horizontal="center"
+            )
+
         for col in range(
             1,
             len(TIME_SLOTS) + 2
         ):
+
             ws.column_dimensions[
                 get_column_letter(col)
             ].width = 14
-
-        for row in ws.iter_rows():
-            for cell in row:
-                cell.border = border
-                cell.alignment = Alignment(
-                    horizontal="center"
-                )
 
         for cell in ws[1]:
             cell.font = Font(bold=True)
@@ -467,7 +533,9 @@ async def check_deadlines():
 
     for message_id, day, deadline in polls:
 
-        deadline_dt = datetime.fromisoformat(deadline)
+        deadline_dt = datetime.fromisoformat(
+            deadline
+        )
 
         if now >= deadline_dt:
 
