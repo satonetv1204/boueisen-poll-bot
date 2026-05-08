@@ -3,6 +3,9 @@
 import os
 import sqlite3
 from datetime import datetime, timedelta
+from threading import Thread
+
+from flask import Flask
 
 import discord
 from discord.ext import commands, tasks
@@ -10,6 +13,23 @@ from discord.ext import commands, tasks
 import openpyxl
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
+
+# =========================
+# WEB SERVER
+# =========================
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running"
+
+def run_web():
+    app.run(host='0.0.0.0', port=10000)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
 
 # =========================
 # TOKEN
@@ -142,7 +162,7 @@ def create_poll_embed(day, deadline_text):
     embed.description = text
 
     embed.set_footer(
-        text="ボタンで複数選択可能"
+        text="ボタンで複数選択可能ぷな！"
     )
 
     return embed
@@ -188,7 +208,7 @@ class TimeButton(discord.ui.Button):
             if closed == 1:
 
                 await interaction.response.send_message(
-                    "このアンケートは締切済みです",
+                    "このアンケートは締切済みぷな～",
                     ephemeral=True
                 )
 
@@ -325,7 +345,7 @@ class PollView(discord.ui.View):
 
 @bot.tree.command(
     name="create_poll",
-    description="4日分アンケート作成"
+    description="4日分アンケート作成するぷな！"
 )
 async def create_poll(interaction: discord.Interaction):
 
@@ -362,7 +382,7 @@ async def create_poll(interaction: discord.Interaction):
         conn.commit()
 
     await interaction.response.send_message(
-        "✅ アンケートを作成しました",
+        "✅ アンケートを作成したぷな！",
         ephemeral=True
     )
 
@@ -564,4 +584,5 @@ async def on_ready():
 # RUN
 # =========================
 
+keep_alive()
 bot.run(TOKEN)
