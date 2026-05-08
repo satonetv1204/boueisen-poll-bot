@@ -127,17 +127,15 @@ def create_poll_embed(day, deadline_text):
 
         users = [u[0] for u in users]
 
-        # 投票者がいる時間帯のみ表示
         if users:
 
             user_text = ", ".join(users)
 
             text += (
-                f"**{slot} ({len(users)})** "
-                f"{user_text}\n"
+                f"**{slot} ({len(users)})**\n"
+                f"・{user_text}\n"
             )
 
-    # 誰も投票してない時
     if text == "":
         text = "まだ投票がありません"
 
@@ -172,7 +170,7 @@ class TimeButton(discord.ui.Button):
         user_name = interaction.user.display_name
 
         # =========================
-        # 締切チェック
+        # 締切確認
         # =========================
 
         poll_data = c.execute("""
@@ -197,7 +195,7 @@ class TimeButton(discord.ui.Button):
                 return
 
         # =========================
-        # 既存投票確認
+        # 投票済み確認
         # =========================
 
         c.execute("""
